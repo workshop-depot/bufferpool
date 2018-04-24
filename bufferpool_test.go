@@ -31,11 +31,19 @@ func Test_makePartitions_1(t *testing.T) {
 	}
 
 	for kp := range pool {
-		pool[kp] = append(pool[kp], []byte(strings.Repeat("*", 200))...)
+		pool[kp] = append(pool[kp][:0], []byte(strings.Repeat("*", 10))...)
 	}
 
 	for _, v := range back {
-		assert.Equal("-"[0], v)
+		assert.Equal("*"[0], v)
+	}
+
+	for kp := range pool {
+		pool[kp] = append(pool[kp][:0], []byte(strings.Repeat("-", 11))...)
+	}
+
+	for _, v := range back {
+		assert.Equal("*"[0], v)
 	}
 }
 
