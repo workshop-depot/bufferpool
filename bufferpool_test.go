@@ -3,6 +3,7 @@ package bufferpool
 import (
 	"bytes"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -131,4 +132,66 @@ func Test_Smoke_BufferPool(t *testing.T) {
 
 	big = make([]byte, 100)
 	assert.False(pool.Put(big))
+}
+
+func Test_BufferPool_Concurrent(t *testing.T) {
+	assert := assert.New(t)
+
+	// run with go test -race
+	pool := New(10, 1000)
+
+	start := make(chan struct{})
+	var done sync.WaitGroup
+	var step1 sync.WaitGroup
+	for i := 0; i < 1000; i++ {
+		done.Add(1)
+		step1.Add(1)
+		go func() {
+			defer done.Done()
+			buffer := pool.Take()
+			step1.Done()
+			defer pool.Put(buffer)
+			<-start
+			for k := range buffer {
+				buffer[k] = byte(k & 0xFF)
+			}
+		}()
+	}
+
+	step1.Wait()
+	assert.Equal(0, pool.Len())
+	close(start)
+	done.Wait()
+}
+
+func ExampleBufferPool() {
+	pool := New(10, 1000)
+
+	func() {
+		buffer := pool.Take()
+		defer pool.Put(buffer)
+	}()
+}
+
+func ExampleBufferPool_concurrent() {
+	// run with go test -race
+	pool := New(10, 1000)
+
+	start := make(chan struct{})
+	var done sync.WaitGroup
+	for i := 0; i < 1000; i++ {
+		done.Add(1)
+		go func() {
+			defer done.Done()
+			<-start
+			buffer := pool.Take()
+			defer pool.Put(buffer)
+			for k := range buffer {
+				buffer[k] = byte(k & 0xFF)
+			}
+		}()
+	}
+
+	close(start)
+	done.Wait()
 }
